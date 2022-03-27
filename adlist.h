@@ -33,24 +33,27 @@
 
 /* Node, List, and Iterator are the only data structures used currently. */
 
+// 双端链表节点
 typedef struct listNode {
     struct listNode *prev;
     struct listNode *next;
     void *value;
 } listNode;
 
+// 链表 Iterator
 typedef struct listIter {
     listNode *next;
-    int direction;
+    int direction; // 方向：正向 or 反向
 } listIter;
 
+// 链表 
 typedef struct list {
-    listNode *head;
-    listNode *tail;
-    void *(*dup)(void *ptr);
-    void (*free)(void *ptr);
-    int (*match)(void *ptr, void *key);
-    unsigned long len;
+    listNode *head; // 头节点
+    listNode *tail; // 尾节点
+    void *(*dup)(void *ptr); // 自定义节点值复制函数
+    void (*free)(void *ptr); // 自定义节点释放函数
+    int (*match)(void *ptr, void *key); // 自定义节点值匹配函数
+    unsigned long len; // 链表长度
 } list;
 
 /* Functions implemented as macros */
@@ -70,27 +73,45 @@ typedef struct list {
 #define listGetMatchMethod(l) ((l)->match)
 
 /* Prototypes */
+// 链表创建
 list *listCreate(void);
+// 链表释放
 void listRelease(list *list);
+// 清空链表
 void listEmpty(list *list);
+// 头插
 list *listAddNodeHead(list *list, void *value);
+// 尾插
 list *listAddNodeTail(list *list, void *value);
+// 插入节点 after or before old_node 
 list *listInsertNode(list *list, listNode *old_node, void *value, int after);
+// 删除节点
 void listDelNode(list *list, listNode *node);
+// 链表迭代器
 listIter *listGetIterator(list *list, int direction);
+// 迭代器下一个节点
 listNode *listNext(listIter *iter);
+// 释放迭代器
 void listReleaseIterator(listIter *iter);
+// 复制链表
 list *listDup(list *orig);
+// 搜索 key 对应的 listNode
 listNode *listSearchKey(list *list, void *key);
+// 获取 list index 的 listNode
 listNode *listIndex(list *list, long index);
+// 初始化 迭代器：从头到尾
 void listRewind(list *list, listIter *li);
+// 初始化 迭代器：从尾到头
 void listRewindTail(list *list, listIter *li);
+// 将尾节点移至头部
 void listRotateTailToHead(list *list);
+// 将头节点移至尾部
 void listRotateHeadToTail(list *list);
+// 将 链表 o 加到 l 后面
 void listJoin(list *l, list *o);
 
 /* Directions for iterators */
-#define AL_START_HEAD 0
-#define AL_START_TAIL 1
+#define AL_START_HEAD 0 // 从头到尾
+#define AL_START_TAIL 1 // 从尾到头
 
 #endif /* __ADLIST_H__ */
