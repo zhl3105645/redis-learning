@@ -47,40 +47,52 @@
 /* Unused arguments generate annoying warnings... */
 #define DICT_NOTUSED(V) ((void) V)
 
+// hash 节点
 typedef struct dictEntry {
-    void *key;
+    void *key; // 键
     union {
         void *val;
         uint64_t u64;
         int64_t s64;
         double d;
-    } v;
-    struct dictEntry *next;
+    } v; // 值
+    struct dictEntry *next; // 指向下一个 Hash 节点
 } dictEntry;
 
+// 字典类型函数 dictTyoe
 typedef struct dictType {
+    // 计算哈希值的函数
     uint64_t (*hashFunction)(const void *key);
+    // 复制键的函数
     void *(*keyDup)(void *privdata, const void *key);
+    // 复制值的函数
     void *(*valDup)(void *privdata, const void *obj);
+    // 比较键的函数
     int (*keyCompare)(void *privdata, const void *key1, const void *key2);
+    // 销毁键的函数
     void (*keyDestructor)(void *privdata, void *key);
+    // 销毁值的函数
     void (*valDestructor)(void *privdata, void *obj);
+    // 是否允许扩展
     int (*expandAllowed)(size_t moreMem, double usedRatio);
 } dictType;
 
 /* This is our hash table structure. Every dictionary has two of this as we
  * implement incremental rehashing, for the old to the new table. */
+
+// 哈希表， 每个字典有两个哈希表，因为 rehash 时采取渐进式哈希
 typedef struct dictht {
-    dictEntry **table;
-    unsigned long size;
-    unsigned long sizemask;
-    unsigned long used;
+    dictEntry **table; // 哈希表数组，
+    unsigned long size; // 哈希表大小
+    unsigned long sizemask; // 哈希表大小掩码，用于计算索引值 size - 1
+    unsigned long used; // 哈希表已有节点数量
 } dictht;
 
+// 字典
 typedef struct dict {
-    dictType *type;
-    void *privdata;
-    dictht ht[2];
+    dictType *type; // 字典类型，保存一些用于操作特定类型键值对函数
+    void *privdata; // 私有数据，保存需要传给哪些类型特定函数的可选数据
+    dictht ht[2]; // 一个字典结构包括两个 哈希表
     long rehashidx; /* rehashing not in progress if rehashidx == -1 */
     int16_t pauserehash; /* If >0 rehashing is paused (<0 indicates coding error) */
 } dict;
@@ -161,12 +173,18 @@ typedef void (dictScanBucketFunction)(void *privdata, dictEntry **bucketref);
 #endif
 
 /* API */
+
+// 创建字典
 dict *dictCreate(dictType *type, void *privDataPtr);
+// 扩展 字典大小到 size
 int dictExpand(dict *d, unsigned long size);
 int dictTryExpand(dict *d, unsigned long size);
+// 向 dict 添加 key
 int dictAdd(dict *d, void *key, void *val);
+// 向字典添加key，若存在返回NULL,否则返回 dictEntry，但是不设置值，用户自己设置
 dictEntry *dictAddRaw(dict *d, void *key, dictEntry **existing);
 dictEntry *dictAddOrFind(dict *d, void *key);
+// 添加 或 覆盖
 int dictReplace(dict *d, void *key, void *val);
 int dictDelete(dict *d, const void *key);
 dictEntry *dictUnlink(dict *ht, const void *key);
@@ -188,7 +206,13 @@ uint64_t dictGenCaseHashFunction(const unsigned char *buf, int len);
 void dictEmpty(dict *d, void(callback)(void*));
 void dictEnableResize(void);
 void dictDisableResize(void);
+// 执行 N 步渐进式 rehash 操作
+// 如果旧表仍存在数据待迁移，则返回1，否则返回0
+// 每一步操作移动一个索引值的键值对到新表
+// 每一步最多允许访问 n * 10 的空桶
 int dictRehash(dict *d, int n);
+// rehash操作每次执行 ms 时间退出
+// 一次操作 执行 dictRehash(d, 100)
 int dictRehashMilliseconds(dict *d, int ms);
 void dictSetHashFunctionSeed(uint8_t *seed);
 uint8_t *dictGetHashFunctionSeed(void);

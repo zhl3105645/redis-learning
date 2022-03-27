@@ -182,6 +182,7 @@ int _dictExpand(dict *d, unsigned long size, int* malloc_failed)
     }
 
     /* Prepare a second hash table for incremental rehashing */
+    // 准备 rehash
     d->ht[1] = n;
     d->rehashidx = 0;
     return DICT_OK;
@@ -208,7 +209,13 @@ int dictTryExpand(dict *d, unsigned long size) {
  * guaranteed that this function will rehash even a single bucket, since it
  * will visit at max N*10 empty buckets in total, otherwise the amount of
  * work it does would be unbound and the function may block for a long time. */
+
+// 执行 N 步渐进式 rehash 操作
+// 如果旧表仍存在数据待迁移，则返回1，否则返回0
+// 每一步操作移动一个索引值的键值对到新表
+// 每一步最多允许访问 n * 10 的空桶
 int dictRehash(dict *d, int n) {
+    // 允许最大访问的空桶值
     int empty_visits = n*10; /* Max number of empty buckets to visit. */
     if (!dictIsRehashing(d)) return 0;
 
@@ -217,13 +224,18 @@ int dictRehash(dict *d, int n) {
 
         /* Note that rehashidx can't overflow as we are sure there are more
          * elements because ht[0].used != 0 */
+
+        // rehashidx 需要小于 hashTable 的大小
         assert(d->ht[0].size > (unsigned long)d->rehashidx);
+        // 空桶
         while(d->ht[0].table[d->rehashidx] == NULL) {
             d->rehashidx++;
             if (--empty_visits == 0) return 1;
         }
+        // 非空 hashEntry
         de = d->ht[0].table[d->rehashidx];
         /* Move all the keys in this bucket from the old to the new hash HT */
+        // 将 de 中的所有 hashEntry 移动到 ht[1]
         while(de) {
             uint64_t h;
 
@@ -241,6 +253,7 @@ int dictRehash(dict *d, int n) {
     }
 
     /* Check if we already rehashed the whole table... */
+    // rehash 完成，ht[0] = ht[1], ht[1]初始化
     if (d->ht[0].used == 0) {
         zfree(d->ht[0].table);
         d->ht[0] = d->ht[1];
@@ -253,6 +266,7 @@ int dictRehash(dict *d, int n) {
     return 1;
 }
 
+// 获取当前时间（毫秒级）
 long long timeInMilliseconds(void) {
     struct timeval tv;
 
@@ -263,6 +277,9 @@ long long timeInMilliseconds(void) {
 /* Rehash in ms+"delta" milliseconds. The value of "delta" is larger 
  * than 0, and is smaller than 1 in most cases. The exact upper bound 
  * depends on the running time of dictRehash(d,100).*/
+
+// rehash操作每次执行 ms 时间退出
+// 一次操作 执行 dictRehash(d, 100)
 int dictRehashMilliseconds(dict *d, int ms) {
     if (d->pauserehash > 0) return 0;
 
@@ -284,6 +301,8 @@ int dictRehashMilliseconds(dict *d, int ms) {
  * This function is called by common lookup or update operations in the
  * dictionary so that the hash table automatically migrates from H1 to H2
  * while it is actively used. */
+
+// 没有暂停 rehash 时, rehash 
 static void _dictRehashStep(dict *d) {
     if (d->pauserehash == 0) dictRehash(d,1);
 }
@@ -316,6 +335,8 @@ int dictAdd(dict *d, void *key, void *val)
  *
  * If key was added, the hash entry is returned to be manipulated by the caller.
  */
+
+// 向字典添加key，若存在返回NULL,否则返回 dictEntry，但是不设置值，用户自己设置
 dictEntry *dictAddRaw(dict *d, void *key, dictEntry **existing)
 {
     long index;
@@ -326,6 +347,7 @@ dictEntry *dictAddRaw(dict *d, void *key, dictEntry **existing)
 
     /* Get the index of the new element, or -1 if
      * the element already exists. */
+    // 获取 key 对应的index
     if ((index = _dictKeyIndex(d, key, dictHashKey(d,key), existing)) == -1)
         return NULL;
 
@@ -333,7 +355,10 @@ dictEntry *dictAddRaw(dict *d, void *key, dictEntry **existing)
      * Insert the element in top, with the assumption that in a database
      * system it is more likely that recently added entries are accessed
      * more frequently. */
+
+    // 根据 rehashing 选择 hashTable
     ht = dictIsRehashing(d) ? &d->ht[1] : &d->ht[0];
+    // 插入链表头部
     entry = zmalloc(sizeof(*entry));
     entry->next = ht->table[index];
     ht->table[index] = entry;
@@ -1025,6 +1050,8 @@ static unsigned long _dictNextPower(unsigned long size)
  *
  * Note that if we are in the process of rehashing the hash table, the
  * index is always returned in the context of the second (new) hash table. */
+
+// 返回 key 对应的 index，若正在 rehash，则返回的是 ht[1] 中的 index
 static long _dictKeyIndex(dict *d, const void *key, uint64_t hash, dictEntry **existing)
 {
     unsigned long idx, table;
@@ -1045,6 +1072,7 @@ static long _dictKeyIndex(dict *d, const void *key, uint64_t hash, dictEntry **e
             }
             he = he->next;
         }
+        // rehash 时继续，得到的是 ht[1] 中的结果
         if (!dictIsRehashing(d)) break;
     }
     return idx;
