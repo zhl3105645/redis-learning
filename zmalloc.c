@@ -38,6 +38,8 @@
  * for instance to free results obtained by backtrace_symbols(). We need
  * to define this function before including zmalloc.h that may shadow the
  * free implementation if we use jemalloc or another non standard allocator. */
+
+// 提供访问 原始的库函数 free() ; 需要在include前定义，否则采用其他的内存分配方法会覆盖这个free函数 
 void zlibc_free(void *ptr) {
     free(ptr);
 }
@@ -63,9 +65,13 @@ void zlibc_free(void *ptr) {
 /* When using the libc allocator, use a minimum allocation size to match the
  * jemalloc behavior that doesn't return NULL in this case.
  */
+
+// 分配的最小内存
 #define MALLOC_MIN_SIZE(x) ((x) > 0 ? (x) : sizeof(long))
 
 /* Explicitly override malloc/free etc when using tcmalloc. */
+
+// 显式覆盖 malloc/free
 #if defined(USE_TCMALLOC)
 #define malloc(size) tc_malloc(size)
 #define calloc(count,size) tc_calloc(count,size)
@@ -83,8 +89,10 @@ void zlibc_free(void *ptr) {
 #define update_zmalloc_stat_alloc(__n) atomicIncr(used_memory,(__n))
 #define update_zmalloc_stat_free(__n) atomicDecr(used_memory,(__n))
 
+// redis 已使用 内存
 static redisAtomic size_t used_memory = 0;
 
+// 内存溢出
 static void zmalloc_default_oom(size_t size) {
     fprintf(stderr, "zmalloc: Out of memory trying to allocate %zu bytes\n",
         size);
@@ -92,10 +100,13 @@ static void zmalloc_default_oom(size_t size) {
     abort();
 }
 
+// 内存溢出的处理函数
 static void (*zmalloc_oom_handler)(size_t) = zmalloc_default_oom;
 
 /* Try allocating memory, and return NULL if failed.
  * '*usable' is set to the usable size if non NULL. */
+
+// 尝试分配内存，失败返回 NULL 
 void *ztrymalloc_usable(size_t size, size_t *usable) {
     ASSERT_NO_SIZE_OVERFLOW(size);
     void *ptr = malloc(MALLOC_MIN_SIZE(size)+PREFIX_SIZE);
@@ -115,6 +126,8 @@ void *ztrymalloc_usable(size_t size, size_t *usable) {
 }
 
 /* Allocate memory or panic */
+
+// 分配内存，若失败调用 oom 处理函数
 void *zmalloc(size_t size) {
     void *ptr = ztrymalloc_usable(size, NULL);
     if (!ptr) zmalloc_oom_handler(size);
@@ -122,6 +135,8 @@ void *zmalloc(size_t size) {
 }
 
 /* Try allocating memory, and return NULL if failed. */
+
+// 尝试分配内存， 失败返回 NULL， 不调用 oom 处理函数
 void *ztrymalloc(size_t size) {
     void *ptr = ztrymalloc_usable(size, NULL);
     return ptr;
@@ -129,6 +144,8 @@ void *ztrymalloc(size_t size) {
 
 /* Allocate memory or panic.
  * '*usable' is set to the usable size if non NULL. */
+
+// 分配内存，若失败调用 oom 处理函数，若成功则将 usable 设为分配内存大小
 void *zmalloc_usable(size_t size, size_t *usable) {
     void *ptr = ztrymalloc_usable(size, usable);
     if (!ptr) zmalloc_oom_handler(size);
@@ -138,6 +155,8 @@ void *zmalloc_usable(size_t size, size_t *usable) {
 /* Allocation and free functions that bypass the thread cache
  * and go straight to the allocator arena bins.
  * Currently implemented only for jemalloc. Used for online defragmentation. */
+
+// 碎片整理功能，绕过线程直接在分配器区域处理
 #ifdef HAVE_DEFRAG
 void *zmalloc_no_tcache(size_t size) {
     ASSERT_NO_SIZE_OVERFLOW(size);
@@ -156,6 +175,8 @@ void zfree_no_tcache(void *ptr) {
 
 /* Try allocating memory and zero it, and return NULL if failed.
  * '*usable' is set to the usable size if non NULL. */
+
+// 尝试分配内存并且将内存块置零
 void *ztrycalloc_usable(size_t size, size_t *usable) {
     ASSERT_NO_SIZE_OVERFLOW(size);
     void *ptr = calloc(1, MALLOC_MIN_SIZE(size)+PREFIX_SIZE);
@@ -175,6 +196,8 @@ void *ztrycalloc_usable(size_t size, size_t *usable) {
 }
 
 /* Allocate memory and zero it or panic */
+
+// 分配内存并将内存块置零，or Panic
 void *zcalloc(size_t size) {
     void *ptr = ztrycalloc_usable(size, NULL);
     if (!ptr) zmalloc_oom_handler(size);
@@ -182,6 +205,8 @@ void *zcalloc(size_t size) {
 }
 
 /* Try allocating memory, and return NULL if failed. */
+
+// 尝试分配内存并将内存块置零，no panic 
 void *ztrycalloc(size_t size) {
     void *ptr = ztrycalloc_usable(size, NULL);
     return ptr;
@@ -189,6 +214,8 @@ void *ztrycalloc(size_t size) {
 
 /* Allocate memory or panic.
  * '*usable' is set to the usable size if non NULL. */
+
+// 分配内存并将内存块置零,若成功则将 usable 设为分配内存大小，or Panic
 void *zcalloc_usable(size_t size, size_t *usable) {
     void *ptr = ztrycalloc_usable(size, usable);
     if (!ptr) zmalloc_oom_handler(size);
@@ -197,6 +224,8 @@ void *zcalloc_usable(size_t size, size_t *usable) {
 
 /* Try reallocating memory, and return NULL if failed.
  * '*usable' is set to the usable size if non NULL. */
+
+//尝试重新分配内存，若成功则将 usable 设为分配内存大小 
 void *ztryrealloc_usable(void *ptr, size_t size, size_t *usable) {
     ASSERT_NO_SIZE_OVERFLOW(size);
 #ifndef HAVE_MALLOC_SIZE
@@ -206,12 +235,14 @@ void *ztryrealloc_usable(void *ptr, size_t size, size_t *usable) {
     void *newptr;
 
     /* not allocating anything, just redirect to free. */
+    // 不分配内存，将指针所指内存释放
     if (size == 0 && ptr != NULL) {
         zfree(ptr);
         if (usable) *usable = 0;
         return NULL;
     }
     /* Not freeing anything, just redirect to malloc. */
+    // 不释放内存，而是尝试分配内存
     if (ptr == NULL)
         return ztrymalloc_usable(size, usable);
 
@@ -246,6 +277,8 @@ void *ztryrealloc_usable(void *ptr, size_t size, size_t *usable) {
 }
 
 /* Reallocate memory and zero it or panic */
+
+// 重新分配内存且内存块置零，or panic 
 void *zrealloc(void *ptr, size_t size) {
     ptr = ztryrealloc_usable(ptr, size, NULL);
     if (!ptr && size != 0) zmalloc_oom_handler(size);
@@ -253,6 +286,8 @@ void *zrealloc(void *ptr, size_t size) {
 }
 
 /* Try Reallocating memory, and return NULL if failed. */
+
+// 尝试重新分配内存，no panic 
 void *ztryrealloc(void *ptr, size_t size) {
     ptr = ztryrealloc_usable(ptr, size, NULL);
     return ptr;
@@ -260,6 +295,8 @@ void *ztryrealloc(void *ptr, size_t size) {
 
 /* Reallocate memory or panic.
  * '*usable' is set to the usable size if non NULL. */
+
+// 重新分配内存，成功则将 usable 设为分配内存大小
 void *zrealloc_usable(void *ptr, size_t size, size_t *usable) {
     ptr = ztryrealloc_usable(ptr, size, usable);
     if (!ptr && size != 0) zmalloc_oom_handler(size);
@@ -269,6 +306,8 @@ void *zrealloc_usable(void *ptr, size_t size, size_t *usable) {
 /* Provide zmalloc_size() for systems where this function is not provided by
  * malloc itself, given that in that case we store a header with this
  * information as the first bytes of every allocation. */
+
+// 为不支持这个函数的系统提供 zmalloc_size(), 在分配内存的头上存储一个字节的信息
 #ifndef HAVE_MALLOC_SIZE
 size_t zmalloc_size(void *ptr) {
     void *realptr = (char*)ptr-PREFIX_SIZE;
@@ -317,6 +356,7 @@ void zfree_usable(void *ptr, size_t *usable) {
 #endif
 }
 
+// 复制 s 表示的字符串，并返回
 char *zstrdup(const char *s) {
     size_t l = strlen(s)+1;
     char *p = zmalloc(l);
@@ -325,12 +365,14 @@ char *zstrdup(const char *s) {
     return p;
 }
 
+// 返回已经使用的内存大小
 size_t zmalloc_used_memory(void) {
     size_t um;
     atomicGet(used_memory,um);
     return um;
 }
 
+// 设置oom处理函数
 void zmalloc_set_oom_handler(void (*oom_handler)(size_t)) {
     zmalloc_oom_handler = oom_handler;
 }
@@ -473,6 +515,7 @@ size_t zmalloc_get_rss(void) {
 #endif
 
 #if defined(USE_JEMALLOC)
+
 
 int zmalloc_get_allocator_info(size_t *allocated,
                                size_t *active,
@@ -635,6 +678,8 @@ size_t zmalloc_get_private_dirty(long pid) {
  * 3) Was modified for Redis by Matt Stancliff.
  * 4) This note exists in order to comply with the original license.
  */
+
+// 返回物理内存的大小 RAM 
 size_t zmalloc_get_memory_size(void) {
 #if defined(__unix__) || defined(__unix) || defined(unix) || \
     (defined(__APPLE__) && defined(__MACH__))

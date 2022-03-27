@@ -92,12 +92,15 @@
 /* We can enable the Redis defrag capabilities only if we are using Jemalloc
  * and the version used is our special version modified for Redis having
  * the ability to return per-allocation fragmentation hints. */
+
+// 只有使用了 Jemalloc 内存分配 并且使用的版本是为 redis 修改的特殊版本
+// 才能使用 redis 碎片整理功能
 #if defined(USE_JEMALLOC) && defined(JEMALLOC_FRAG_HINT)
 #define HAVE_DEFRAG
 #endif
 
-void *zmalloc(size_t size);
-void *zcalloc(size_t size);
+void *zmalloc(size_t size);  // malloc; 
+void *zcalloc(size_t size); // calloc； 内存块置零
 void *zrealloc(void *ptr, size_t size);
 void *ztrymalloc(size_t size);
 void *ztrycalloc(size_t size);
@@ -110,17 +113,17 @@ void *ztrymalloc_usable(size_t size, size_t *usable);
 void *ztrycalloc_usable(size_t size, size_t *usable);
 void *ztryrealloc_usable(void *ptr, size_t size, size_t *usable);
 void zfree_usable(void *ptr, size_t *usable);
-char *zstrdup(const char *s);
-size_t zmalloc_used_memory(void);
-void zmalloc_set_oom_handler(void (*oom_handler)(size_t));
-size_t zmalloc_get_rss(void);
+char *zstrdup(const char *s); // 字符串复制
+size_t zmalloc_used_memory(void); // 获取占用内存大小
+void zmalloc_set_oom_handler(void (*oom_handler)(size_t)); // 设置 oom 的处理函数
+size_t zmalloc_get_rss(void); // 获取RSS信息(Resident Set Size)
 int zmalloc_get_allocator_info(size_t *allocated, size_t *active, size_t *resident);
 void set_jemalloc_bg_thread(int enable);
 int jemalloc_purge();
-size_t zmalloc_get_private_dirty(long pid);
+size_t zmalloc_get_private_dirty(long pid); // 获取实际内存大小
 size_t zmalloc_get_smap_bytes_by_field(char *field, long pid);
-size_t zmalloc_get_memory_size(void);
-void zlibc_free(void *ptr);
+size_t zmalloc_get_memory_size(void); // 获取物理内存 RAM 大小
+void zlibc_free(void *ptr); // 原始系统 free 释放方法
 
 #ifdef HAVE_DEFRAG
 void zfree_no_tcache(void *ptr);

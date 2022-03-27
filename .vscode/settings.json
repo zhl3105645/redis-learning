@@ -2,6 +2,7 @@
     "files.associations": {
         "server.h": "c",
         "signal.h": "c",
-        "sha256.h": "c"
+        "sha256.h": "c",
+        "atomic": "c"
     }
 }
