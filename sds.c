@@ -100,28 +100,41 @@ static inline size_t sdsTypeMaxSize(char type) {
  * You can print the string with printf() as there is an implicit \0 at the
  * end of the string. However the string is binary safe and can contain
  * \0 characters in the middle, as the length is stored in the sds header. */
+
+// 创建 sds 字符串
+// init : init 为 null，内存初始化为0，为 SDS_NOINIT，不初始化
+// initlen : sds 长度
+// trymalloc : 是否是尝试分配内存，yes panic, or no panic 
 sds _sdsnewlen(const void *init, size_t initlen, int trymalloc) {
     void *sh;
     sds s;
+    // 根据长度选择 sds 类型
     char type = sdsReqType(initlen);
     /* Empty strings are usually created in order to append. Use type 8
      * since type 5 is not good at this. */
     if (type == SDS_TYPE_5 && initlen == 0) type = SDS_TYPE_8;
+    // 获取 header 长度
     int hdrlen = sdsHdrSize(type);
     unsigned char *fp; /* flags pointer. */
     size_t usable;
 
     assert(initlen + hdrlen + 1 > initlen); /* Catch size_t overflow */
+    // 分配内存
     sh = trymalloc?
         s_trymalloc_usable(hdrlen+initlen+1, &usable) :
         s_malloc_usable(hdrlen+initlen+1, &usable);
+    // 内存分配失败
     if (sh == NULL) return NULL;
+    // 不初始化为0
     if (init==SDS_NOINIT)
         init = NULL;
     else if (!init)
         memset(sh, 0, hdrlen+initlen+1);
+    // 字符串指针
     s = (char*)sh+hdrlen;
+    // flags 指针
     fp = ((unsigned char*)s)-1;
+    // 可用字符串的长度
     usable = usable-hdrlen-1;
     if (usable > sdsTypeMaxSize(type))
         usable = sdsTypeMaxSize(type);
@@ -161,6 +174,7 @@ sds _sdsnewlen(const void *init, size_t initlen, int trymalloc) {
     }
     if (initlen && init)
         memcpy(s, init, initlen);
+    // 字符串结尾
     s[initlen] = '\0';
     return s;
 }
@@ -230,6 +244,8 @@ void sdsclear(sds s) {
  *
  * Note: this does not change the *length* of the sds string as returned
  * by sdslen(), but only the free buffer space we have. */
+
+// sds 空间扩大 addlen
 sds sdsMakeRoomFor(sds s, size_t addlen) {
     void *sh, *newsh;
     size_t avail = sdsavail(s);
@@ -245,6 +261,7 @@ sds sdsMakeRoomFor(sds s, size_t addlen) {
     sh = (char*)s-sdsHdrSize(oldtype);
     reqlen = newlen = (len+addlen);
     assert(newlen > len);   /* Catch size_t overflow */
+    // 扩容选择：两倍还是加
     if (newlen < SDS_MAX_PREALLOC)
         newlen *= 2;
     else

@@ -40,10 +40,18 @@ extern const char *SDS_NOINIT;
 #include <stdarg.h>
 #include <stdint.h>
 
+// 数据结构定义 sds
+// 与 char * 不同的是，sds 是二进制安全的，可以存储任意二进制数据，不需要以’\0‘表示结束
 typedef char *sds;
 
 /* Note: sdshdr5 is never used, we just access the flags byte directly.
  * However is here to document the layout of type 5 SDS strings. */
+
+// 五种 sds Header 定义，满足不同长度字符串可以使用不同大小的 Header，从而节省内存
+// len : 字符串真正的长度，不包含终止字符
+// alloc : 字符串的最大容量，不包含 Header 和最后的空终止字符
+// flags : 表示 Header 的类型
+// buf : 数据部分
 struct __attribute__ ((__packed__)) sdshdr5 {
     unsigned char flags; /* 3 lsb of type, and 5 msb of string length */
     char buf[];
@@ -78,12 +86,13 @@ struct __attribute__ ((__packed__)) sdshdr64 {
 #define SDS_TYPE_16 2
 #define SDS_TYPE_32 3
 #define SDS_TYPE_64 4
-#define SDS_TYPE_MASK 7
-#define SDS_TYPE_BITS 3
-#define SDS_HDR_VAR(T,s) struct sdshdr##T *sh = (void*)((s)-(sizeof(struct sdshdr##T)));
+#define SDS_TYPE_MASK 7 // 类型掩码 0111
+#define SDS_TYPE_BITS 3 // 类型使用 bit 数
+#define SDS_HDR_VAR(T,s) struct sdshdr##T *sh = (void*)((s)-(sizeof(struct sdshdr##T))); // 获取 header 头指针
 #define SDS_HDR(T,s) ((struct sdshdr##T *)((s)-(sizeof(struct sdshdr##T))))
-#define SDS_TYPE_5_LEN(f) ((f)>>SDS_TYPE_BITS)
+#define SDS_TYPE_5_LEN(f) ((f)>>SDS_TYPE_BITS) // 获取 sdshdr5 的长度
 
+// sds 的实际字符串长度
 static inline size_t sdslen(const sds s) {
     unsigned char flags = s[-1];
     switch(flags&SDS_TYPE_MASK) {
@@ -101,6 +110,7 @@ static inline size_t sdslen(const sds s) {
     return 0;
 }
 
+// sds 可提供的字符串的长度
 static inline size_t sdsavail(const sds s) {
     unsigned char flags = s[-1];
     switch(flags&SDS_TYPE_MASK) {
@@ -127,6 +137,7 @@ static inline size_t sdsavail(const sds s) {
     return 0;
 }
 
+// sds 设置 字符串长度
 static inline void sdssetlen(sds s, size_t newlen) {
     unsigned char flags = s[-1];
     switch(flags&SDS_TYPE_MASK) {
@@ -151,6 +162,7 @@ static inline void sdssetlen(sds s, size_t newlen) {
     }
 }
 
+// sds 字符串长度 增大 inc
 static inline void sdsinclen(sds s, size_t inc) {
     unsigned char flags = s[-1];
     switch(flags&SDS_TYPE_MASK) {
@@ -177,6 +189,8 @@ static inline void sdsinclen(sds s, size_t inc) {
 }
 
 /* sdsalloc() = sdsavail() + sdslen() */
+
+// sds 字符串的最大容量：可用 + 已用
 static inline size_t sdsalloc(const sds s) {
     unsigned char flags = s[-1];
     switch(flags&SDS_TYPE_MASK) {
@@ -194,6 +208,7 @@ static inline size_t sdsalloc(const sds s) {
     return 0;
 }
 
+// sds 设置字符串最大容量
 static inline void sdssetalloc(sds s, size_t newlen) {
     unsigned char flags = s[-1];
     switch(flags&SDS_TYPE_MASK) {
@@ -215,17 +230,29 @@ static inline void sdssetalloc(sds s, size_t newlen) {
     }
 }
 
+// sds 创建，指定初始化长度
 sds sdsnewlen(const void *init, size_t initlen);
+// sds 尝试创建，指定初始化长度
 sds sdstrynewlen(const void *init, size_t initlen);
+// 从 null 或者 已存在的字符串 创建 sds
 sds sdsnew(const char *init);
+// 创建空 sds
 sds sdsempty(void);
+// 复制 sds
 sds sdsdup(const sds s);
+// 释放 sds 的内存
 void sdsfree(sds s);
+// 将 sds 增长到指定的长度
 sds sdsgrowzero(sds s, size_t len);
+// 将 len 长度的t指针指向的字符串添加到 s 之后
 sds sdscatlen(sds s, const void *t, size_t len);
+// 将 t 指针指向的字符串添加到 s 之后
 sds sdscat(sds s, const char *t);
+// 将 t 的字符串添加到 s 之后
 sds sdscatsds(sds s, const sds t);
+// 将 len 长度的t指针指向的字符串复制到 s 
 sds sdscpylen(sds s, const char *t, size_t len);
+// 将 t指针指向的字符串复制到 s
 sds sdscpy(sds s, const char *t);
 
 sds sdscatvprintf(sds s, const char *fmt, va_list ap);
@@ -236,10 +263,15 @@ sds sdscatprintf(sds s, const char *fmt, ...)
 sds sdscatprintf(sds s, const char *fmt, ...);
 #endif
 
+// sds 格式化输出
 sds sdscatfmt(sds s, char const *fmt, ...);
+// sds 字符串头尾去除
 sds sdstrim(sds s, const char *cset);
+// sds 字符串的子集
 void sdssubstr(sds s, size_t start, size_t len);
+// sds 截取函数 
 void sdsrange(sds s, ssize_t start, ssize_t end);
+// sds 更新长度
 void sdsupdatelen(sds s);
 void sdsclear(sds s);
 int sdscmp(const sds s1, const sds s2);
