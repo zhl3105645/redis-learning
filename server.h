@@ -504,10 +504,16 @@ typedef enum {
 /* A redis object, that is a type able to hold a string / list / set */
 
 /* The actual Redis Object */
+// redis 用户可见的五种数据类型
+//编码方式：OBJ_ENCODING_RAW ,OBJ_ENCODING_INT ,OBJ_ENCODING_EMBSTR
 #define OBJ_STRING 0    /* String object. */
+//编码方式：OBJ_ENCODING_LINKEDLIST ,OBJ_ENCODING_ZIPLIST ,OBJ_ENCODING_QUICKLIST
 #define OBJ_LIST 1      /* List object. */
+//编码方式：OBJ_ENCODING_INTSET ,OBJ_ENCODING_HT
 #define OBJ_SET 2       /* Set object. */
+//编码方式：OBJ_ENCODING_ZIPLIST ,OBJ_ENCODING_SKIPLIST
 #define OBJ_ZSET 3      /* Sorted set object. */
+//编码方式：OBJ_ENCODING_ZIPLIST ,OBJ_ENCODING_HT
 #define OBJ_HASH 4      /* Hash object. */
 
 /* The "module" object type is a special one that signals that the object
@@ -651,15 +657,26 @@ typedef struct RedisModuleDigest {
 /* Objects encoding. Some kind of objects like Strings and Hashes can be
  * internally represented in multiple ways. The 'encoding' field of the object
  * is set to one of this fields for this object. */
+
+// 底层实现：简单动态字符串 sds
 #define OBJ_ENCODING_RAW 0     /* Raw representation */
+// 底层实现：long 类型的整数
 #define OBJ_ENCODING_INT 1     /* Encoded as integer */
+// 底层实现：字典 dict
 #define OBJ_ENCODING_HT 2      /* Encoded as hash table */
+// 不再使用
 #define OBJ_ENCODING_ZIPMAP 3  /* Encoded as zipmap */
+// 底层实现：双端队列 adlist
 #define OBJ_ENCODING_LINKEDLIST 4 /* No longer used: old list encoding. */
+// 底层实现：压缩列表 ziplist
 #define OBJ_ENCODING_ZIPLIST 5 /* Encoded as ziplist */
+// 底层实现： 整数集合 intset 
 #define OBJ_ENCODING_INTSET 6  /* Encoded as intset */
+// 底层实现：跳表skiplist 字典 dict 
 #define OBJ_ENCODING_SKIPLIST 7  /* Encoded as skiplist */
+// 底层实现：EMBSTR 编码的简单动态字符串sds
 #define OBJ_ENCODING_EMBSTR 8  /* Embedded sds string encoding */
+// 底层实现：由双端列表和压缩列表构成的快速列表
 #define OBJ_ENCODING_QUICKLIST 9 /* Encoded as linked list of ziplists */
 #define OBJ_ENCODING_STREAM 10 /* Encoded as a radix tree of listpacks */
 
@@ -670,14 +687,18 @@ typedef struct RedisModuleDigest {
 #define OBJ_SHARED_REFCOUNT INT_MAX     /* Global object never destroyed. */
 #define OBJ_STATIC_REFCOUNT (INT_MAX-1) /* Object allocated in the stack. */
 #define OBJ_FIRST_SPECIAL_REFCOUNT OBJ_STATIC_REFCOUNT
+
+// redis 对用户创建了五种类型，定义 redisObject 更好的表示这五种
 typedef struct redisObject {
-    unsigned type:4;
-    unsigned encoding:4;
+    unsigned type:4; // 数据类型 - 4bits
+    unsigned encoding:4; // redis 对象的编码方式 - 4bits
+    // 最后一次被访问的时间 - 24bits 
+    // 为了计算该对象的空转时长，便于后续根据空转时长决定是否释放该键，回收内存
     unsigned lru:LRU_BITS; /* LRU time (relative to global lru_clock) or
                             * LFU data (least significant 8 bits frequency
                             * and most significant 16 bits access time). */
-    int refcount;
-    void *ptr;
+    int refcount; // C不具有自动内存回收机制，引用计数，在适当的时候释放内存进行回收
+    void *ptr; // 指向对象中实际存放的值
 } robj;
 
 /* The a string name for an object's type as listed above

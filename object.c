@@ -38,6 +38,7 @@
 
 /* ===================== Creation and parsing of objects ==================== */
 
+// 创建对象 设定参数 采用raw编码方式
 robj *createObject(int type, void *ptr) {
     robj *o = zmalloc(sizeof(*o));
     o->type = type;
@@ -74,6 +75,9 @@ robj *makeObjectShared(robj *o) {
 
 /* Create a string object with encoding OBJ_ENCODING_RAW, that is a plain
  * string object where o->ptr points to a proper sds string. */
+
+// RAW编码需要调用两次内存分配函数
+// 一是为redisObject分内内存，二是为sds字符串分配内存
 robj *createRawStringObject(const char *ptr, size_t len) {
     return createObject(OBJ_STRING, sdsnewlen(ptr,len));
 }
@@ -81,10 +85,14 @@ robj *createRawStringObject(const char *ptr, size_t len) {
 /* Create a string object with encoding OBJ_ENCODING_EMBSTR, that is
  * an object where the sds string is actually an unmodifiable string
  * allocated in the same chunk as the object itself. */
+
+// EMRSTR编码只需要调用一次内存分配函数
+// 它的redisobject和sds是放在一段连续的内存空间上
 robj *createEmbeddedStringObject(const char *ptr, size_t len) {
     robj *o = zmalloc(sizeof(robj)+sizeof(struct sdshdr8)+len+1);
+    // sds 的起始地址 sh
     struct sdshdr8 *sh = (void*)(o+1);
-
+    // 设定 redisObject的参数
     o->type = OBJ_STRING;
     o->encoding = OBJ_ENCODING_EMBSTR;
     o->ptr = sh+1;
@@ -94,7 +102,7 @@ robj *createEmbeddedStringObject(const char *ptr, size_t len) {
     } else {
         o->lru = LRU_CLOCK();
     }
-
+    // 设定sds字符串的参数
     sh->len = len;
     sh->alloc = len;
     sh->flags = SDS_TYPE_8;
@@ -116,6 +124,7 @@ robj *createEmbeddedStringObject(const char *ptr, size_t len) {
  * The current limit of 44 is chosen so that the biggest string object
  * we allocate as EMBSTR will still fit into the 64 byte arena of jemalloc. */
 #define OBJ_ENCODING_EMBSTR_SIZE_LIMIT 44
+// 创建字符串对象
 robj *createStringObject(const char *ptr, size_t len) {
     if (len <= OBJ_ENCODING_EMBSTR_SIZE_LIMIT)
         return createEmbeddedStringObject(ptr,len);
@@ -173,6 +182,8 @@ robj *createStringObjectFromLongLongWithOptions(long long value, int valueobj) {
 
 /* Wrapper for createStringObjectFromLongLongWithOptions() always demanding
  * to create a shared object if possible. */
+
+// 根据传入的 longlong 整数值，创建一个字符串
 robj *createStringObjectFromLongLong(long long value) {
     return createStringObjectFromLongLongWithOptions(value,0);
 }
@@ -191,6 +202,8 @@ robj *createStringObjectFromLongLongForValue(long long value) {
  * and the output of snprintf() is not modified.
  *
  * The 'humanfriendly' option is used for INCRBYFLOAT and HINCRBYFLOAT. */
+
+// 根据传入了 double 值，创建一个字符串
 robj *createStringObjectFromLongDouble(long double value, int humanfriendly) {
     char buf[MAX_LONG_DOUBLE_CHARS];
     int len = ld2string(buf,sizeof(buf),value,humanfriendly? LD_STR_HUMAN: LD_STR_AUTO);
@@ -226,6 +239,7 @@ robj *dupStringObject(const robj *o) {
     }
 }
 
+// 创建快速链表编码的列表对象
 robj *createQuicklistObject(void) {
     quicklist *l = quicklistCreate();
     robj *o = createObject(OBJ_LIST,l);
@@ -233,6 +247,7 @@ robj *createQuicklistObject(void) {
     return o;
 }
 
+// 创建压缩链表编码的列表对象
 robj *createZiplistObject(void) {
     unsigned char *zl = ziplistNew();
     robj *o = createObject(OBJ_LIST,zl);
@@ -240,6 +255,7 @@ robj *createZiplistObject(void) {
     return o;
 }
 
+// 创建集合对象
 robj *createSetObject(void) {
     dict *d = dictCreate(&setDictType,NULL);
     robj *o = createObject(OBJ_SET,d);
@@ -247,6 +263,7 @@ robj *createSetObject(void) {
     return o;
 }
 
+// 创建整数集合编码的集合对象
 robj *createIntsetObject(void) {
     intset *is = intsetNew();
     robj *o = createObject(OBJ_SET,is);
@@ -254,6 +271,7 @@ robj *createIntsetObject(void) {
     return o;
 }
 
+// 创建hash对象
 robj *createHashObject(void) {
     unsigned char *zl = ziplistNew();
     robj *o = createObject(OBJ_HASH, zl);
@@ -261,6 +279,7 @@ robj *createHashObject(void) {
     return o;
 }
 
+// 创建zset对象
 robj *createZsetObject(void) {
     zset *zs = zmalloc(sizeof(*zs));
     robj *o;
@@ -272,6 +291,7 @@ robj *createZsetObject(void) {
     return o;
 }
 
+// 创建压缩列表编码的zset对象
 robj *createZsetZiplistObject(void) {
     unsigned char *zl = ziplistNew();
     robj *o = createObject(OBJ_ZSET,zl);
@@ -293,12 +313,14 @@ robj *createModuleObject(moduleType *mt, void *value) {
     return createObject(OBJ_MODULE,mv);
 }
 
+// 释放字符串对象
 void freeStringObject(robj *o) {
     if (o->encoding == OBJ_ENCODING_RAW) {
         sdsfree(o->ptr);
     }
 }
 
+// 释放链表对象
 void freeListObject(robj *o) {
     if (o->encoding == OBJ_ENCODING_QUICKLIST) {
         quicklistRelease(o->ptr);
@@ -307,6 +329,7 @@ void freeListObject(robj *o) {
     }
 }
 
+// 释放集合对象
 void freeSetObject(robj *o) {
     switch (o->encoding) {
     case OBJ_ENCODING_HT:
@@ -320,6 +343,7 @@ void freeSetObject(robj *o) {
     }
 }
 
+// 释放zset对象
 void freeZsetObject(robj *o) {
     zset *zs;
     switch (o->encoding) {
@@ -337,6 +361,7 @@ void freeZsetObject(robj *o) {
     }
 }
 
+// 释放hash对象
 void freeHashObject(robj *o) {
     switch (o->encoding) {
     case OBJ_ENCODING_HT:
@@ -373,8 +398,10 @@ void incrRefCount(robj *o) {
     }
 }
 
+// 引用次数 -1
 void decrRefCount(robj *o) {
     if (o->refcount == 1) {
+        // 根据对象类型，选择不同的底层函数释放
         switch(o->type) {
         case OBJ_STRING: freeStringObject(o); break;
         case OBJ_LIST: freeListObject(o); break;
@@ -387,7 +414,9 @@ void decrRefCount(robj *o) {
         }
         zfree(o);
     } else {
+        // 引用计数小于零，报错
         if (o->refcount <= 0) serverPanic("decrRefCount against refcount <= 0");
+        // -1
         if (o->refcount != OBJ_SHARED_REFCOUNT) o->refcount--;
     }
 }
@@ -1252,6 +1281,8 @@ robj *objectCommandLookupOrReply(client *c, robj *key, robj *reply) {
 
 /* Object command allows to inspect the internals of a Redis Object.
  * Usage: OBJECT <refcount|encoding|idletime|freq> <key> */
+
+// redis 命令：获取对象的一些参数
 void objectCommand(client *c) {
     robj *o;
 
