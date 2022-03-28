@@ -995,19 +995,20 @@ struct sharedObjectsStruct {
 
 /* ZSETs use a specialized version of Skiplists */
 typedef struct zskiplistNode {
-    sds ele;
-    double score;
-    struct zskiplistNode *backward;
+    sds ele; // 值
+    double score; // 分值
+    struct zskiplistNode *backward; // 后向指针
+    // 层
     struct zskiplistLevel {
-        struct zskiplistNode *forward;
-        unsigned long span;
+        struct zskiplistNode *forward; // 前向指针
+        unsigned long span; // 跨度
     } level[];
 } zskiplistNode;
 
 typedef struct zskiplist {
-    struct zskiplistNode *header, *tail;
-    unsigned long length;
-    int level;
+    struct zskiplistNode *header, *tail; // 头尾节点
+    unsigned long length; // 节点数量
+    int level; // 最大层数
 } zskiplist;
 
 typedef struct zset {
@@ -2161,8 +2162,10 @@ typedef struct {
     int minex, maxex; /* are min or max exclusive? */
 } zlexrangespec;
 
+// 创建跳表
 zskiplist *zslCreate(void);
 void zslFree(zskiplist *zsl);
+// 
 zskiplistNode *zslInsert(zskiplist *zsl, double score, sds ele);
 unsigned char *zzlInsert(unsigned char *zl, sds ele, double score);
 int zslDelete(zskiplist *zsl, double score, sds ele, zskiplistNode **node);
