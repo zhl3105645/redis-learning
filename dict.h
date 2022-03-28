@@ -204,7 +204,9 @@ void dictGetStats(char *buf, size_t bufsize, dict *d);
 uint64_t dictGenHashFunction(const void *key, int len);
 uint64_t dictGenCaseHashFunction(const unsigned char *buf, int len);
 void dictEmpty(dict *d, void(callback)(void*));
+// dict_can_resize 置为 1
 void dictEnableResize(void);
+// dict_can_resize 置为 0
 void dictDisableResize(void);
 // 执行 N 步渐进式 rehash 操作
 // 如果旧表仍存在数据待迁移，则返回1，否则返回0
