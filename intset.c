@@ -97,6 +97,7 @@ static void _intsetSet(intset *is, int pos, int64_t value) {
 /* Create an empty intset. */
 intset *intsetNew(void) {
     intset *is = zmalloc(sizeof(intset));
+    // 默认使用 int_16t编码
     is->encoding = intrev32ifbe(INTSET_ENC_INT16);
     is->length = 0;
     return is;
@@ -211,6 +212,8 @@ intset *intsetAdd(intset *is, int64_t value, uint8_t *success) {
     /* Upgrade encoding if necessary. If we need to upgrade, we know that
      * this value should be either appended (if > 0) or prepended (if < 0),
      * because it lies outside the range of existing values. */
+
+    // 必要时升级编码格式
     if (valenc > intrev32ifbe(is->encoding)) {
         /* This always succeeds, so we don't need to curry *success. */
         return intsetUpgradeAndAdd(is,value);
@@ -218,16 +221,19 @@ intset *intsetAdd(intset *is, int64_t value, uint8_t *success) {
         /* Abort if the value is already present in the set.
          * This call will populate "pos" with the right position to insert
          * the value when it cannot be found. */
+        // 没有超出时，计算待添加整数需要添加到整数集合中的位置
         if (intsetSearch(is,value,&pos)) {
             if (success) *success = 0;
             return is;
         }
-
+        // 调整整数集合的位置
         is = intsetResize(is,intrev32ifbe(is->length)+1);
+        // 移动整数集合的后一部分
         if (pos < intrev32ifbe(is->length)) intsetMoveTail(is,pos,pos+1);
     }
-
+    // 添加数据到第pos位
     _intsetSet(is,pos,value);
+    // 更新 length 值
     is->length = intrev32ifbe(intrev32ifbe(is->length)+1);
     return is;
 }
