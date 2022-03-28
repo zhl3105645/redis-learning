@@ -1140,6 +1140,10 @@ unsigned char *ziplistMerge(unsigned char **first, unsigned char **second) {
     return target;
 }
 
+// ziplist插入节点只能往头或者尾部插入
+// zl: 待插入的ziplist
+// s，slen: 待插入节点和其长度
+// where: 带插入的位置，0代表头部插入，1代表尾部插入
 unsigned char *ziplistPush(unsigned char *zl, unsigned char *s, unsigned int slen, int where) {
     unsigned char *p;
     p = (where == ZIPLIST_HEAD) ? ZIPLIST_ENTRY_HEAD(zl) : ZIPLIST_ENTRY_END(zl);
