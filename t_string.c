@@ -76,14 +76,18 @@ static int checkStringLength(client *c, long long size) {
 void setGenericCommand(client *c, int flags, robj *key, robj *val, robj *expire, int unit, robj *ok_reply, robj *abort_reply) {
     long long milliseconds = 0, when = 0; /* initialized to avoid any harmness warning */
 
+    // 设定过期时间
     if (expire) {
+        // 尝试将 expire 赋值给 milliseconds
         if (getLongLongFromObjectOrReply(c, expire, &milliseconds, NULL) != C_OK)
             return;
+        // 负值或者是乘法会溢出
         if (milliseconds <= 0 || (unit == UNIT_SECONDS && milliseconds > LLONG_MAX / 1000)) {
             /* Negative value provided or multiplication is gonna overflow. */
             addReplyErrorFormat(c, "invalid expire time in %s", c->cmd->name);
             return;
         }
+        // 转换为毫秒
         if (unit == UNIT_SECONDS) milliseconds *= 1000;
         when = milliseconds;
         if ((flags & OBJ_PX) || (flags & OBJ_EX))
@@ -95,6 +99,7 @@ void setGenericCommand(client *c, int flags, robj *key, robj *val, robj *expire,
         }
     }
 
+    // 判断 key 是否存在，并根据 NX 和 XX 命令来决定set命令知否执行
     if ((flags & OBJ_SET_NX && lookupKeyWrite(c->db,key) != NULL) ||
         (flags & OBJ_SET_XX && lookupKeyWrite(c->db,key) == NULL))
     {
@@ -102,15 +107,22 @@ void setGenericCommand(client *c, int flags, robj *key, robj *val, robj *expire,
         return;
     }
 
+    // 先执行GET，再进行SET
     if (flags & OBJ_SET_GET) {
         if (getGenericCommand(c) == C_ERR) return;
     }
 
+    // SET 将键值对关联到数据库
     genericSetKey(c,c->db,key, val,flags & OBJ_KEEPTTL,1);
+    // 设置该数据库为脏
     server.dirty++;
+    // 发送事件通知
     notifyKeyspaceEvent(NOTIFY_STRING,"set",key,c->db->id);
+    
     if (expire) {
+        // 设置过期时间
         setExpire(c,c->db,key,when);
+        // 发送事件通知
         notifyKeyspaceEvent(NOTIFY_GENERIC,"expire",key,c->db->id);
 
         /* Propagate as SET Key Value PXAT millisecond-timestamp if there is EXAT/PXAT or
@@ -128,10 +140,12 @@ void setGenericCommand(client *c, int flags, robj *key, robj *val, robj *expire,
         decrRefCount(millisecondObj);
     }
     if (!(flags & OBJ_SET_GET)) {
+        // 向客户端发送命令处理结果
         addReply(c, ok_reply ? ok_reply : shared.ok);
     }
 
     /* Propagate without the GET argument (Isn't needed if we had expire since in that case we completely re-written the command argv) */
+    // TODO: 没看懂。。
     if ((flags & OBJ_SET_GET) && !expire) {
         int argc = 0;
         int j;
@@ -261,11 +275,13 @@ void setCommand(client *c) {
     int unit = UNIT_SECONDS;
     int flags = OBJ_NO_FLAGS;
 
+    // 获取命令参数
     if (parseExtendedStringArgumentsOrReply(c,&flags,&unit,&expire,COMMAND_SET) != C_OK) {
         return;
     }
-
+    // 尝试对value编码为整数或者采用EMBSTR编码字符串
     c->argv[2] = tryObjectEncoding(c->argv[2]);
+    // 调用底层函数对键值对进行设定
     setGenericCommand(c,flags,c->argv[1],c->argv[2],expire,unit,NULL,NULL);
 }
 
@@ -281,6 +297,7 @@ void setexCommand(client *c) {
     setGenericCommand(c,OBJ_EX,c->argv[1],c->argv[3],c->argv[2],UNIT_SECONDS,NULL,NULL);
 }
 
+// PSETEX 命令，给出时间才设置值，单位毫秒
 void psetexCommand(client *c) {
     c->argv[3] = tryObjectEncoding(c->argv[3]);
     setGenericCommand(c,OBJ_PX,c->argv[1],c->argv[3],c->argv[2],UNIT_MILLISECONDS,NULL,NULL);
@@ -425,6 +442,7 @@ void getsetCommand(client *c) {
     rewriteClientCommandArgument(c,0,shared.set);
 }
 
+// SETRANGE 命令，范围性的设置值
 void setrangeCommand(client *c) {
     robj *o;
     long offset;
