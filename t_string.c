@@ -37,6 +37,7 @@ int getGenericCommand(client *c);
  * String Commands
  *----------------------------------------------------------------------------*/
 
+// 检查字符串的长度，proto_max_bulk_len = 512ll*1024*1024 即512MB
 static int checkStringLength(client *c, long long size) {
     if (!(c->flags & CLIENT_MASTER) && size > server.proto_max_bulk_len) {
         addReplyError(c,"string exceeds maximum allowed size (proto-max-bulk-len)");
@@ -253,7 +254,8 @@ int parseExtendedStringArgumentsOrReply(client *c, int *flags, int *unit, robj *
 }
 
 /* SET key value [NX] [XX] [KEEPTTL] [GET] [EX <seconds>] [PX <milliseconds>]
- *     [EXAT <seconds-timestamp>][PXAT <milliseconds-timestamp>] */
+ *     [EXAT <seconds-timestamp>][PXAT <milliseconds-timestamp>] 
+ *  SET 命令，设定键值对*/
 void setCommand(client *c) {
     robj *expire = NULL;
     int unit = UNIT_SECONDS;
@@ -267,11 +269,13 @@ void setCommand(client *c) {
     setGenericCommand(c,flags,c->argv[1],c->argv[2],expire,unit,NULL,NULL);
 }
 
+// SETNX 命令，key 不存在时才设置值
 void setnxCommand(client *c) {
     c->argv[2] = tryObjectEncoding(c->argv[2]);
     setGenericCommand(c,OBJ_SET_NX,c->argv[1],c->argv[2],NULL,0,shared.cone,shared.czero);
 }
 
+// SETEX 命令，给出时间才设置值，单位是秒
 void setexCommand(client *c) {
     c->argv[3] = tryObjectEncoding(c->argv[3]);
     setGenericCommand(c,OBJ_EX,c->argv[1],c->argv[3],c->argv[2],UNIT_SECONDS,NULL,NULL);
