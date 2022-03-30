@@ -1708,15 +1708,23 @@ typedef struct _redisSortOperation {
 
 /* Structure to hold list iteration abstraction. */
 typedef struct {
-    robj *subject;
+    // 迭代器指向的对象
+    robj *subject; 
+    // 编码类型
     unsigned char encoding;
+    // 迭代器的方向
     unsigned char direction; /* Iteration direction */
+    // quicklist 的迭代器
     quicklistIter *iter;
 } listTypeIterator;
 
 /* Structure for an entry while iterating over a list. */
+
+// list 中的某个数据项
 typedef struct {
+    // list 迭代器指针
     listTypeIterator *li;
+    // quicklist 中数据项节点结构
     quicklistEntry entry; /* Entry in quicklist */
 } listTypeEntry;
 

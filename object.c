@@ -428,6 +428,7 @@ void decrRefCountVoid(void *o) {
     decrRefCount(o);
 }
 
+// 类型正确返回 0，不正确返回 1
 int checkType(client *c, robj *o, int type) {
     /* A NULL is considered an empty key */
     if (o && o->type != type) {

@@ -40,9 +40,13 @@
  *
  * There is no need for the caller to increment the refcount of 'value' as
  * the function takes care of it if needed. */
+// list 的 push操作，在 quicklist 的基础上做了一层封装
 void listTypePush(robj *subject, robj *value, int where) {
+    // 编码为 QUICKLIST 时进行操作
     if (subject->encoding == OBJ_ENCODING_QUICKLIST) {
+        // 判断压入位置
         int pos = (where == LIST_HEAD) ? QUICKLIST_HEAD : QUICKLIST_TAIL;
+        // 将 整数 转换为 字符类型
         if (value->encoding == OBJ_ENCODING_INT) {
             char buf[32];
             ll2string(buf, 32, (long)value->ptr);
@@ -62,11 +66,14 @@ void *listPopSaver(unsigned char *data, unsigned int sz) {
 robj *listTypePop(robj *subject, int where) {
     long long vlong;
     robj *value = NULL;
-
+    // 判断弹出位置
     int ql_where = where == LIST_HEAD ? QUICKLIST_HEAD : QUICKLIST_TAIL;
+    // 编码方式为 QUICKLIST 时进行操作
     if (subject->encoding == OBJ_ENCODING_QUICKLIST) {
+        // 弹出数据
         if (quicklistPopCustom(subject->ptr, ql_where, (unsigned char **)&value,
                                NULL, &vlong, listPopSaver)) {
+            // 由整型转换为string类型
             if (!value)
                 value = createStringObjectFromLongLong(vlong);
         }
@@ -223,39 +230,50 @@ robj *listTypeDup(robj *o) {
 
 /* Implements LPUSH/RPUSH/LPUSHX/RPUSHX. 
  * 'xx': push if key exists. */
+// push 操作函数
 void pushGenericCommand(client *c, int where, int xx) {
     int j;
-
+    
+    // 长度检查
     for (j = 2; j < c->argc; j++) {
         if (sdslen(c->argv[j]->ptr) > LIST_MAX_ITEM_SIZE) {
             addReplyError(c, "Element too large");
             return;
         }
     }
-
+    // 查找是否存在该键，存在就返回，否则返回NULL
     robj *lobj = lookupKeyWrite(c->db, c->argv[1]);
+    // 检测到是 LIST 类型，直接返回
     if (checkType(c,lobj,OBJ_LIST)) return;
+    // 返回结果为 NULL，即 key 不存在
     if (!lobj) {
+        // 若是LPUSHX 等需要key存在的命令，返回
         if (xx) {
             addReply(c, shared.czero);
             return;
         }
-
+        // 新建 key 对应的 list 对象
         lobj = createQuicklistObject();
         quicklistSetOptions(lobj->ptr, server.list_max_ziplist_size,
                             server.list_compress_depth);
+        // 添加到 db 中
         dbAdd(c->db,c->argv[1],lobj);
     }
 
+    // 添加数据元素
     for (j = 2; j < c->argc; j++) {
+        //  尝试添加数据
         listTypePush(lobj,c->argv[j],where);
+        // 服务器的脏数据个数增加
         server.dirty++;
     }
-
+    // 返回添加到节点数量
     addReplyLongLong(c, listTypeLength(lobj));
 
     char *event = (where == LIST_HEAD) ? "lpush" : "rpush";
+    // 发送键修改信号
     signalModifiedKey(c,c->db,c->argv[1]);
+    // 发送时间通知
     notifyKeyspaceEvent(NOTIFY_LIST,event,c->argv[1],c->db->id);
 }
 
@@ -270,6 +288,7 @@ void rpushCommand(client *c) {
 }
 
 /* LPUSHX <key> <element> [<element> ...] */
+// 已存在 key 才插入
 void lpushxCommand(client *c) {
     pushGenericCommand(c,LIST_HEAD,1);
 }
@@ -931,20 +950,25 @@ int serveClientBlockedOnList(client *receiver, robj *key, robj *dstkey, redisDb 
 }
 
 /* Blocking RPOP/LPOP */
+// 带有阻塞的pop命令实现函数
 void blockingPopGenericCommand(client *c, int where) {
     robj *o;
     mstime_t timeout;
     int j;
-
+    // 取出 timeout 参数
     if (getTimeoutFromObjectOrReply(c,c->argv[c->argc-1],&timeout,UNIT_SECONDS)
         != C_OK) return;
-
+    // 遍历所有输出键
     for (j = 1; j < c->argc-1; j++) {
+        // 在当前db查找 list 键
         o = lookupKeyWrite(c->db,c->argv[j]);
+        // 存在 key 
         if (o != NULL) {
+            // 类型错误
             if (checkType(c,o,OBJ_LIST)) {
                 return;
             } else {
+                // list 不为空，转为普通的pop操作
                 if (listTypeLength(o) != 0) {
                     /* Non empty list, this is like a normal [LR]POP. */
                     robj *value = listTypePop(o,where);
@@ -968,12 +992,14 @@ void blockingPopGenericCommand(client *c, int where) {
 
     /* If we are not allowed to block the client, the only thing
      * we can do is treating it as a timeout (even with timeout 0). */
+    // 不允许阻塞的情况，当作超时的情况返回
     if (c->flags & CLIENT_DENY_BLOCKING) {
         addReplyNullArray(c);
         return;
     }
 
     /* If the keys do not exist we must block */
+    // 超时返回
     struct listPos pos = {where};
     blockForKeys(c,BLOCKED_LIST,c->argv + 1,c->argc - 2,timeout,NULL,&pos,NULL);
 }
