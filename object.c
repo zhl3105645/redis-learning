@@ -272,6 +272,7 @@ robj *createIntsetObject(void) {
 }
 
 // 创建hash对象
+// 默认采用 ziplist 编码
 robj *createHashObject(void) {
     unsigned char *zl = ziplistNew();
     robj *o = createObject(OBJ_HASH, zl);

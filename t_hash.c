@@ -323,15 +323,17 @@ unsigned long hashTypeLength(const robj *o) {
     return length;
 }
 
+// 初始化一个迭代器
 hashTypeIterator *hashTypeInitIterator(robj *subject) {
     hashTypeIterator *hi = zmalloc(sizeof(hashTypeIterator));
     hi->subject = subject;
     hi->encoding = subject->encoding;
-
+    // ZIPLIST 编码
     if (hi->encoding == OBJ_ENCODING_ZIPLIST) {
         hi->fptr = NULL;
         hi->vptr = NULL;
     } else if (hi->encoding == OBJ_ENCODING_HT) {
+    // HT 编码
         hi->di = dictGetIterator(subject->ptr);
     } else {
         serverPanic("Unknown hash encoding");
@@ -339,6 +341,7 @@ hashTypeIterator *hashTypeInitIterator(robj *subject) {
     return hi;
 }
 
+// 释放迭代器
 void hashTypeReleaseIterator(hashTypeIterator *hi) {
     if (hi->encoding == OBJ_ENCODING_HT)
         dictReleaseIterator(hi->di);
@@ -347,7 +350,9 @@ void hashTypeReleaseIterator(hashTypeIterator *hi) {
 
 /* Move to the next entry in the hash. Return C_OK when the next entry
  * could be found and C_ERR when the iterator reaches the end. */
+// 迭代到下一个节点
 int hashTypeNext(hashTypeIterator *hi) {
+    // ZIPLIST 
     if (hi->encoding == OBJ_ENCODING_ZIPLIST) {
         unsigned char *zl;
         unsigned char *fptr, *vptr;
@@ -355,26 +360,31 @@ int hashTypeNext(hashTypeIterator *hi) {
         zl = hi->subject->ptr;
         fptr = hi->fptr;
         vptr = hi->vptr;
-
+    
         if (fptr == NULL) {
             /* Initialize cursor */
+            // 当前域指针为空，初始化为第一个节点
             serverAssert(vptr == NULL);
             fptr = ziplistIndex(zl, 0);
         } else {
             /* Advance cursor */
+            // 域指针为下一个key节点
             serverAssert(vptr != NULL);
             fptr = ziplistNext(zl, vptr);
         }
         if (fptr == NULL) return C_ERR;
 
         /* Grab pointer to the value (fptr points to the field) */
+        // fptr下一个是值节点
         vptr = ziplistNext(zl, fptr);
         serverAssert(vptr != NULL);
 
         /* fptr, vptr now point to the first or next pair */
+        // 更新
         hi->fptr = fptr;
         hi->vptr = vptr;
     } else if (hi->encoding == OBJ_ENCODING_HT) {
+    // HT 编码直接 调用 Hash 的迭代器
         if ((hi->de = dictNext(hi->di)) == NULL) return C_ERR;
     } else {
         serverPanic("Unknown hash encoding");
@@ -496,6 +506,7 @@ void hashTypeConvertZiplist(robj *o, int enc) {
     }
 }
 
+// hash 编码转换，只能从ZIPLIST转化为HT，不能逆操作
 void hashTypeConvert(robj *o, int enc) {
     if (o->encoding == OBJ_ENCODING_ZIPLIST) {
         hashTypeConvertZiplist(o, enc);

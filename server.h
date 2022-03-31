@@ -507,7 +507,8 @@ typedef enum {
 // redis 用户可见的五种数据类型
 //编码方式：OBJ_ENCODING_RAW ,OBJ_ENCODING_INT ,OBJ_ENCODING_EMBSTR
 #define OBJ_STRING 0    /* String object. */
-//编码方式：OBJ_ENCODING_LINKEDLIST ,OBJ_ENCODING_ZIPLIST ,OBJ_ENCODING_QUICKLIST
+//编码方式：OBJ_ENCODING_LINKEDLIST ,OBJ_ENCODING_ZIPLIST 
+//新版: OBJ_ENCODING_QUICKLIST
 #define OBJ_LIST 1      /* List object. */
 //编码方式：OBJ_ENCODING_INTSET ,OBJ_ENCODING_HT
 #define OBJ_SET 2       /* Set object. */
@@ -1740,14 +1741,15 @@ typedef struct {
  * hashes involves both fields and values. Because it is possible that
  * not both are required, store pointers in the iterator to avoid
  * unnecessary memory allocation for fields/values. */
+ // hash 迭代器
 typedef struct {
-    robj *subject;
-    int encoding;
-
-    unsigned char *fptr, *vptr;
-
-    dictIterator *di;
-    dictEntry *de;
+    robj *subject; // 指向的hash对象
+    int encoding;  // 编码类型
+    // 用于迭代ziplist结构
+    unsigned char *fptr, *vptr; // 域指针和值指针
+    // 用于迭代 dict 结构
+    dictIterator *di; // 字典迭代器
+    dictEntry *de; // 指向当前迭代器字典节点的指针
 } hashTypeIterator;
 
 #include "stream.h"  /* Stream data type header file. */
