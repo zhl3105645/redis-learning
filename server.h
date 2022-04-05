@@ -1033,6 +1033,7 @@ typedef struct zskiplist {
     int level; // 最大层数
 } zskiplist;
 
+// zset 的 skiplist 定义
 typedef struct zset {
     dict *dict;
     zskiplist *zsl;

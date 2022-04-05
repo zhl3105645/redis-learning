@@ -760,6 +760,7 @@ double zzlStrtod(unsigned char *vstr, unsigned int vlen) {
     return strtod(buf,NULL);
  }
 
+// 获取 zset 对象中 sptr 指向的分值 score
 double zzlGetScore(unsigned char *sptr) {
     unsigned char *vstr;
     unsigned int vlen;
@@ -779,6 +780,7 @@ double zzlGetScore(unsigned char *sptr) {
 }
 
 /* Return a ziplist element as an SDS string. */
+// 获取 zset 对象中 sptr 指向的元素，返回一个新的redis string 对象，该对象存放元素值
 sds ziplistGetObject(unsigned char *sptr) {
     unsigned char *vstr;
     unsigned int vlen;
@@ -795,6 +797,7 @@ sds ziplistGetObject(unsigned char *sptr) {
 }
 
 /* Compare element in sorted set with given element. */
+// 比较 zset 对象中 eptr 指向的元素与给定元素的大小
 int zzlCompareElements(unsigned char *eptr, unsigned char *cstr, unsigned int clen) {
     unsigned char *vstr;
     unsigned int vlen;
@@ -815,12 +818,14 @@ int zzlCompareElements(unsigned char *eptr, unsigned char *cstr, unsigned int cl
     return cmp;
 }
 
+// 获取 zset 对象中元素的个数，为 ziplist 中元素的一半
 unsigned int zzlLength(unsigned char *zl) {
     return ziplistLen(zl)/2;
 }
 
 /* Move to next entry based on the values in eptr and sptr. Both are set to
  * NULL when there is no next entry. */
+// 获取 zset 对象中eptr指向元素的下一个元素
 void zzlNext(unsigned char *zl, unsigned char **eptr, unsigned char **sptr) {
     unsigned char *_eptr, *_sptr;
     serverAssert(*eptr != NULL && *sptr != NULL);
@@ -840,6 +845,7 @@ void zzlNext(unsigned char *zl, unsigned char **eptr, unsigned char **sptr) {
 
 /* Move to the previous entry based on the values in eptr and sptr. Both are
  * set to NULL when there is no next entry. */
+// 获取 zset 对象中eptr指向元素的下一个元素
 void zzlPrev(unsigned char *zl, unsigned char **eptr, unsigned char **sptr) {
     unsigned char *_eptr, *_sptr;
     serverAssert(*eptr != NULL && *sptr != NULL);
@@ -1089,23 +1095,30 @@ unsigned char *zzlInsertAt(unsigned char *zl, unsigned char *eptr, sds ele, doub
 
 /* Insert (element,score) pair in ziplist. This function assumes the element is
  * not yet present in the list. */
+// 在指定位置插入一个元素及其分值（ele, score）
+// 假定该元素不存在于该 ziplist 中，其中元素按分值大小排序，分值相同，则按字典序排序
 unsigned char *zzlInsert(unsigned char *zl, sds ele, double score) {
     unsigned char *eptr = ziplistIndex(zl,0), *sptr;
     double s;
 
     while (eptr != NULL) {
+        // 得到eptr元素对应的分值对象score
         sptr = ziplistNext(zl,eptr);
         serverAssert(sptr != NULL);
+        // 获取分值
         s = zzlGetScore(sptr);
 
         if (s > score) {
             /* First element with score larger than score for element to be
              * inserted. This means we should take its spot in the list to
              * maintain ordering. */
+            // ziplist 本身排序的，
+            // 如果找到第一个分值大于score的元素，则表明给定元素应该插在当前找的元素的前面
             zl = zzlInsertAt(zl,eptr,ele,score);
             break;
         } else if (s == score) {
             /* Ensure lexicographical ordering for elements. */
+            // 分数相同，按照字典序排序
             if (zzlCompareElements(eptr,(unsigned char*)ele,sdslen(ele)) > 0) {
                 zl = zzlInsertAt(zl,eptr,ele,score);
                 break;
@@ -1113,10 +1126,12 @@ unsigned char *zzlInsert(unsigned char *zl, sds ele, double score) {
         }
 
         /* Move to next element. */
+        // 更新到下一个元素
         eptr = ziplistNext(zl,sptr);
     }
 
     /* Push on tail of list when it was not yet inserted. */
+    // 所有分数都小于score，则插入到ziplist末尾
     if (eptr == NULL)
         zl = zzlInsertAt(zl,NULL,ele,score);
     return zl;
@@ -1203,23 +1218,25 @@ unsigned long zsetLength(const robj *zobj) {
     return length;
 }
 
+// 编码转换
 void zsetConvert(robj *zobj, int encoding) {
     zset *zs;
     zskiplistNode *node, *next;
     sds ele;
     double score;
-
+    // 如果当前编码类型与待转换的类型一致，不需要处理
     if (zobj->encoding == encoding) return;
+    // ziplist 转至 skiplist 编码
     if (zobj->encoding == OBJ_ENCODING_ZIPLIST) {
         unsigned char *zl = zobj->ptr;
         unsigned char *eptr, *sptr;
         unsigned char *vstr;
         unsigned int vlen;
         long long vlong;
-
+        // 检查转换的编码类型是否是 skiplist
         if (encoding != OBJ_ENCODING_SKIPLIST)
             serverPanic("Unknown target encoding");
-
+        // 创建一个新的skiplist编码的zset
         zs = zmalloc(sizeof(*zs));
         zs->dict = dictCreate(&zsetDictType,NULL);
         zs->zsl = zslCreate();
@@ -1228,15 +1245,16 @@ void zsetConvert(robj *zobj, int encoding) {
         serverAssertWithInfo(NULL,zobj,eptr != NULL);
         sptr = ziplistNext(zl,eptr);
         serverAssertWithInfo(NULL,zobj,sptr != NULL);
-
+        // 遍历ziplist,将元素添加到skiplist中
         while (eptr != NULL) {
+            // 获取分值
             score = zzlGetScore(sptr);
             serverAssertWithInfo(NULL,zobj,ziplistGet(eptr,&vstr,&vlen,&vlong));
             if (vstr == NULL)
                 ele = sdsfromlonglong(vlong);
             else
                 ele = sdsnewlen((char*)vstr,vlen);
-
+            // 插入元素到skiplist中
             node = zslInsert(zs->zsl,score,ele);
             serverAssert(dictAdd(zs->dict,ele,&node->score) == DICT_OK);
             zzlNext(zl,&eptr,&sptr);
@@ -1246,19 +1264,24 @@ void zsetConvert(robj *zobj, int encoding) {
         zobj->ptr = zs;
         zobj->encoding = OBJ_ENCODING_SKIPLIST;
     } else if (zobj->encoding == OBJ_ENCODING_SKIPLIST) {
+        // 从 skiplist 转换成 ziplist 编码
         unsigned char *zl = ziplistNew();
-
+        // 检查给定编码是否是 ziplist 
         if (encoding != OBJ_ENCODING_ZIPLIST)
             serverPanic("Unknown target encoding");
 
         /* Approach similar to zslFree(), since we want to free the skiplist at
          * the same time as creating the ziplist. */
+        // 获取 skiplist 数据部分
         zs = zobj->ptr;
+        // 释放字典
         dictRelease(zs->dict);
+        // 取 skiplist 头节点
         node = zs->zsl->header->level[0].forward;
+        // 释放跳跃表表头
         zfree(zs->zsl->header);
         zfree(zs->zsl);
-
+        // 遍历跳跃表，取出里面的元素，并将它们添加到ziplist中
         while (node) {
             zl = zzlInsertAt(zl,NULL,node->ele,node->score);
             next = node->level[0].forward;
@@ -1268,6 +1291,7 @@ void zsetConvert(robj *zobj, int encoding) {
 
         zfree(zs);
         zobj->ptr = zl;
+        // 更新编码类型
         zobj->encoding = OBJ_ENCODING_ZIPLIST;
     } else {
         serverPanic("Unknown sorted set encoding");
@@ -2061,11 +2085,14 @@ typedef struct {
         } set;
 
         /* Sorted set iterators. */
+        // zset 迭代器
         union _iterzset {
+            // 编码为 ziplist 的迭代器结构
             struct {
                 unsigned char *zl;
                 unsigned char *eptr, *sptr;
             } zl;
+            // 编码为 skiplist 的迭代器结构
             struct {
                 zset *zs;
                 zskiplistNode *node;
