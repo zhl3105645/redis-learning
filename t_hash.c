@@ -37,6 +37,8 @@
 /* Check the length of a number of objects to see if we need to convert a
  * ziplist to a real hash. Note that we only check string encoded objects
  * as their string length can be queried in constant time. */
+
+// 检查ziplist存放的长度是否超过，如超过，需要将编码类型转换为字典编码
 void hashTypeTryConversion(robj *o, robj **argv, int start, int end) {
     int i;
     size_t sum = 0;
@@ -206,18 +208,22 @@ int hashTypeExists(robj *o, sds field) {
 #define HASH_SET_COPY 0
 int hashTypeSet(robj *o, sds field, sds value, int flags) {
     int update = 0;
-
+    // ziplist编码
     if (o->encoding == OBJ_ENCODING_ZIPLIST) {
         unsigned char *zl, *fptr, *vptr;
-
+        // hash对象中的数据部分
         zl = o->ptr;
+        // 获取 ziplist 头指针
         fptr = ziplistIndex(zl, ZIPLIST_HEAD);
         if (fptr != NULL) {
+            // 定位到域 field
             fptr = ziplistFind(zl, fptr, (unsigned char*)field, sdslen(field), 1);
             if (fptr != NULL) {
                 /* Grab pointer to the value (fptr points to the field) */
+                // 定位域对应的值
                 vptr = ziplistNext(zl, fptr);
                 serverAssert(vptr != NULL);
+                // 标记这次为更新操作
                 update = 1;
 
                 /* Replace value */
@@ -225,7 +231,7 @@ int hashTypeSet(robj *o, sds field, sds value, int flags) {
                         sdslen(value));
             }
         }
-
+        // 不是更新，则需要添加键值对
         if (!update) {
             /* Push new field/value pair onto the tail of the ziplist */
             zl = ziplistPush(zl, (unsigned char*)field, sdslen(field),
@@ -233,13 +239,16 @@ int hashTypeSet(robj *o, sds field, sds value, int flags) {
             zl = ziplistPush(zl, (unsigned char*)value, sdslen(value),
                     ZIPLIST_TAIL);
         }
+        // 更新 zl
         o->ptr = zl;
 
         /* Check if the ziplist needs to be converted to a hash table */
+        // 检查是否需要将ziplist转变成hash表
         if (hashTypeLength(o) > server.hash_max_ziplist_entries)
             hashTypeConvert(o, OBJ_ENCODING_HT);
     } else if (o->encoding == OBJ_ENCODING_HT) {
         dictEntry *de = dictFind(o->ptr,field);
+        // 存在，更新
         if (de) {
             sdsfree(dictGetVal(de));
             if (flags & HASH_SET_TAKE_VALUE) {
