@@ -1730,11 +1730,12 @@ typedef struct {
 } listTypeEntry;
 
 /* Structure to hold set iteration abstraction. */
+// set 的迭代器
 typedef struct {
-    robj *subject;
-    int encoding;
-    int ii; /* intset iterator */
-    dictIterator *di;
+    robj *subject; // 指向的set对象
+    int encoding; // 编码类型
+    int ii; /* intset iterator */ // 如果是intset,下标即可代表迭代器
+    dictIterator *di; // 如果是 ht 编码，则采用字典的迭代器
 } setTypeIterator;
 
 /* Structure to hold hash iteration abstraction. Note that iteration over

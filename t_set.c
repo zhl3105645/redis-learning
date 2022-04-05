@@ -49,32 +49,43 @@ robj *setTypeCreate(sds value) {
  *
  * If the value was already member of the set, nothing is done and 0 is
  * returned, otherwise the new element is added and 1 is returned. */
+
+// 向 set 中添加数据，若已经存在返回 0，否则返回 1
 int setTypeAdd(robj *subject, sds value) {
     long long llval;
+    // 底层编码为 HT，则直接调用字典的添加元素函数
     if (subject->encoding == OBJ_ENCODING_HT) {
         dict *ht = subject->ptr;
         dictEntry *de = dictAddRaw(ht,value,NULL);
+        // 添加成功
         if (de) {
             dictSetKey(ht,de,sdsdup(value));
             dictSetVal(ht,de,NULL);
             return 1;
         }
     } else if (subject->encoding == OBJ_ENCODING_INTSET) {
+        // 编码类型为 intset
         if (isSdsRepresentableAsLongLong(value,&llval) == C_OK) {
+            // 待添加元素是整数类型
             uint8_t success = 0;
+            // 调用 intset 的添加元素函数
             subject->ptr = intsetAdd(subject->ptr,llval,&success);
+            // 成功
             if (success) {
                 /* Convert to regular set when the intset contains
                  * too many entries. */
+                // 判断 intset 长度是否超过了设定的最大值
                 size_t max_entries = server.set_max_intset_entries;
                 /* limit to 1G entries due to intset internals. */
                 if (max_entries >= 1<<30) max_entries = 1<<30;
+                // 超过，则将底层编码转换成 ht
                 if (intsetLen(subject->ptr) > max_entries)
                     setTypeConvert(subject,OBJ_ENCODING_HT);
                 return 1;
             }
         } else {
             /* Failed to get integer from object, convert to regular set. */
+            // 待添加元素不是整数，则需要将编码类型转换成 HT
             setTypeConvert(subject,OBJ_ENCODING_HT);
 
             /* The set *was* an intset and this value is not integer
@@ -121,6 +132,7 @@ int setTypeIsMember(robj *subject, sds value) {
     return 0;
 }
 
+// 初始化迭代器
 setTypeIterator *setTypeInitIterator(robj *subject) {
     setTypeIterator *si = zmalloc(sizeof(setTypeIterator));
     si->subject = subject;
@@ -135,6 +147,7 @@ setTypeIterator *setTypeInitIterator(robj *subject) {
     return si;
 }
 
+// 释放迭代器
 void setTypeReleaseIterator(setTypeIterator *si) {
     if (si->encoding == OBJ_ENCODING_HT)
         dictReleaseIterator(si->di);
@@ -154,6 +167,8 @@ void setTypeReleaseIterator(setTypeIterator *si) {
  * used field with values which are easy to trap if misused.
  *
  * When there are no longer elements -1 is returned. */
+
+// 指向下一个迭代器，并返回当前位置的值
 int setTypeNext(setTypeIterator *si, sds *sdsele, int64_t *llele) {
     if (si->encoding == OBJ_ENCODING_HT) {
         dictEntry *de = dictNext(si->di);
@@ -235,27 +250,34 @@ unsigned long setTypeSize(const robj *subject) {
 /* Convert the set to specified encoding. The resulting dict (when converting
  * to a hash table) is presized to hold the number of elements in the original
  * set. */
+
+// 将集合转换成特定的编码 HT
 void setTypeConvert(robj *setobj, int enc) {
     setTypeIterator *si;
     serverAssertWithInfo(NULL,setobj,setobj->type == OBJ_SET &&
                              setobj->encoding == OBJ_ENCODING_INTSET);
 
+    // 只能由 ziplist 转为 ht
     if (enc == OBJ_ENCODING_HT) {
         int64_t intele;
         dict *d = dictCreate(&setDictType,NULL);
         sds element;
 
         /* Presize the dict to avoid rehashing */
+        // 预先调整dict的大小，避免rehash
         dictExpand(d,intsetLen(setobj->ptr));
 
         /* To add the elements we extract integers and create redis objects */
+        // 初始化迭代器，遍历 intset，然后依次加入到 dict 中
         si = setTypeInitIterator(setobj);
         while (setTypeNext(si,&element,&intele) != -1) {
+            // 将整数类型转换为字符串对象
             element = sdsfromlonglong(intele);
             serverAssert(dictAdd(d,element,NULL) == DICT_OK);
         }
+        // 释放迭代器
         setTypeReleaseIterator(si);
-
+        // 设置编码类型
         setobj->encoding = OBJ_ENCODING_HT;
         zfree(setobj->ptr);
         setobj->ptr = d;
@@ -303,20 +325,25 @@ robj *setTypeDup(robj *o) {
 void saddCommand(client *c) {
     robj *set;
     int j, added = 0;
-
+    // 查看数据库中是否存在该集合键
     set = lookupKeyWrite(c->db,c->argv[1]);
     if (checkType(c,set,OBJ_SET)) return;
     
     if (set == NULL) {
+        // 不存在，则需要创建该集合键
         set = setTypeCreate(c->argv[2]->ptr);
         dbAdd(c->db,c->argv[1],set);
     }
-
+    // 从第三个参数开始，为待添加的函数
     for (j = 2; j < c->argc; j++) {
+        // 调用集合 set 的添加元素
         if (setTypeAdd(set,c->argv[j]->ptr)) added++;
     }
+    // 如果至少添加成功了一个元素
     if (added) {
+        // 发送通知
         signalModifiedKey(c,c->db,c->argv[1]);
+        // 发送时间通知
         notifyKeyspaceEvent(NOTIFY_SET,"sadd",c->argv[1],c->db->id);
     }
     server.dirty += added;
