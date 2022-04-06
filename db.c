@@ -60,9 +60,12 @@ void updateLFU(robj *val) {
 /* Low level key lookup API, not actually called directly from commands
  * implementations that should instead rely on lookupKeyRead(),
  * lookupKeyWrite() and lookupKeyReadWithFlags(). */
+
+// 从数据库中取出指定键对应的值对象，如不存在则返回 null
 robj *lookupKey(redisDb *db, robj *key, int flags) {
     dictEntry *de = dictFind(db->dict,key->ptr);
     if (de) {
+        // 获取键对应的值
         robj *val = dictGetVal(de);
 
         /* Update the access time for the ageing algorithm.
@@ -190,12 +193,18 @@ robj *lookupKeyWriteOrReply(client *c, robj *key, robj *reply) {
  * counter of the value if needed.
  *
  * The program is aborted if the key already exists. */
+
+// 添加键值对
 void dbAdd(redisDb *db, robj *key, robj *val) {
+    // 键对象复制
     sds copy = sdsdup(key->ptr);
+    // 添加到数据库
     int retval = dictAdd(db->dict, copy, val);
 
     serverAssertWithInfo(NULL,key,retval == DICT_OK);
+    // 判断该键是否是引起阻塞的键
     signalKeyAsReady(db, key, val->type);
+    // 如果开启了集群选项，需要做响相应的处理
     if (server.cluster_enabled) slotToKeyAdd(key->ptr);
 }
 
@@ -258,12 +267,17 @@ void dbOverwrite(redisDb *db, robj *key, robj *val) {
  * in a context where there is no clear client performing the operation. */
 void genericSetKey(client *c, redisDb *db, robj *key, robj *val, int keepttl, int signal) {
     if (lookupKeyWrite(db,key) == NULL) {
+        // 键不存在，添加
         dbAdd(db,key,val);
     } else {
+        // 键存在，覆写值对象
         dbOverwrite(db,key,val);
     }
+    // 增加引用技术
     incrRefCount(val);
+    // 删除过期时间
     if (!keepttl) removeExpire(db,key);
+    // 发送键修改通知
     if (signal) signalModifiedKey(c,db,key);
 }
 
@@ -1483,12 +1497,14 @@ void propagateExpire(redisDb *db, robj *key, int lazy) {
 
 /* Check if the key is expired. */
 int keyIsExpired(redisDb *db, robj *key) {
+    // 获取该键过期时间
     mstime_t when = getExpire(db,key);
     mstime_t now;
-
+    // 没有过期时间
     if (when < 0) return 0; /* No expire for this key */
 
     /* Don't expire anything while loading. It will be done later. */
+    // server加载数据的时候，不要处理
     if (server.loading) return 0;
 
     /* If we are in the context of a Lua script, we pretend that time is
@@ -1549,6 +1565,7 @@ int expireIfNeeded(redisDb *db, robj *key) {
      * Still we try to return the right information to the caller,
      * that is, 0 if we think the key should be still valid, 1 if
      * we think the key is expired at this time. */
+    // 从节点不主动删除key
     if (server.masterhost != NULL) return 1;
 
     /* If clients are paused, we keep the current dataset constant,

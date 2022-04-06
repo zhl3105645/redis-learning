@@ -730,13 +730,22 @@ typedef struct clientReplyBlock {
 /* Redis database representation. There are multiple databases identified
  * by integers from 0 (the default database) up to the max configured
  * database. The database number is the 'id' field in the structure. */
+
+// redis 的数据库表示，默认为0号数据库,默认有16个数据库
 typedef struct redisDb {
+    // 键空间
     dict *dict;                 /* The keyspace for this DB */
+    // 键及其过期时间
     dict *expires;              /* Timeout of keys with a timeout set */
+    // 存放所有造成阻塞的键以及客户端
     dict *blocking_keys;        /* Keys with clients waiting for data (BLPOP)*/
+    // 存放push操作添加的造成阻塞的键，便于解阻塞
     dict *ready_keys;           /* Blocked keys that received a PUSH */
+    // 被watch命令监控的键和对应的客户端
     dict *watched_keys;         /* WATCHED keys for MULTI/EXEC CAS */
+    // 数据库ID
     int id;                     /* Database ID */
+    // 数据库的平均生存时间
     long long avg_ttl;          /* Average TTL, just for stats */
     unsigned long expires_cursor; /* Cursor of the active expire cycle. */
     list *defrag_later;         /* List of key names to attempt to defrag one by one, gradually. */
@@ -1185,6 +1194,7 @@ typedef enum childInfoType {
     CHILD_INFO_TYPE_MODULE_COW_SIZE
 } childInfoType;
 
+// redis 服务器
 struct redisServer {
     /* General */
     pid_t pid;                  /* Main process pid. */
@@ -1199,7 +1209,7 @@ struct redisServer {
     mode_t umask;               /* The umask value of the process on startup */
     int hz;                     /* serverCron() calls frequency in hertz */
     int in_fork_child;          /* indication that this is a fork child */
-    redisDb *db;
+    redisDb *db; // 指向 redis 的数据库
     dict *commands;             /* Command table */
     dict *orig_commands;        /* Command table before command renaming. */
     aeEventLoop *el;
@@ -1351,6 +1361,7 @@ struct redisServer {
     int active_defrag_cycle_max;       /* maximal effort for defrag in CPU percentage */
     unsigned long active_defrag_max_scan_fields; /* maximum number of fields of set/hash/zset/list to process from within the main dict scan */
     size_t client_max_querybuf_len; /* Limit for client query buffer length */
+    // 数据库的数量
     int dbnum;                      /* Total number of configured DBs */
     int supervised;                 /* 1 if supervised, 0 otherwise. */
     int supervised_mode;            /* See SUPERVISED_* */

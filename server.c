@@ -1405,13 +1405,22 @@ dictType zsetDictType = {
 };
 
 /* Db->dict, keys are sds strings, vals are Redis objects. */
+
+// 键空间字典的键为字符串对象，值为redisObject
 dictType dbDictType = {
+    // Hash 函数
     dictSdsHash,                /* hash function */
+    // 键复制函数
     NULL,                       /* key dup */
+    // 值复制函数
     NULL,                       /* val dup */
+    // 键比较函数
     dictSdsKeyCompare,          /* key compare */
+    // 键释放函数
     dictSdsDestructor,          /* key destructor */
+    // 值释放函数
     dictObjectDestructor,       /* val destructor */
+    // 允许dict扩容
     dictExpandAllowed           /* allow to expand */
 };
 
