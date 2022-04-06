@@ -37,6 +37,7 @@
  *
  * The function returns -1 if the input contains characters not mapping to
  * any class. */
+// 将 Notify 设置参数转换成标识量flag
 int keyspaceEventsStringToFlags(char *classes) {
     char *p = classes;
     int c, flags = 0;
@@ -67,6 +68,7 @@ int keyspaceEventsStringToFlags(char *classes) {
  * as input an integer with the xored flags and returns a string representing
  * the selected classes. The string returned is an sds string that needs to
  * be released with sdsfree(). */
+// 将 Notify 设置参数由标示量转换成字符串
 sds keyspaceEventsFlagsToString(int flags) {
     sds res;
 
@@ -98,6 +100,7 @@ sds keyspaceEventsFlagsToString(int flags) {
  * 'event' is a C string representing the event name.
  * 'key' is a Redis object representing the key name.
  * 'dbid' is the database ID where the key lives.  */
+// 通知功能的实现
 void notifyKeyspaceEvent(int type, char *event, robj *key, int dbid) {
     sds chan;
     robj *chanobj, *eventobj;
@@ -111,11 +114,13 @@ void notifyKeyspaceEvent(int type, char *event, robj *key, int dbid) {
      moduleNotifyKeyspaceEvent(type, event, key, dbid);
 
     /* If notifications for this class of events are off, return ASAP. */
+    // 通知功能关闭
     if (!(server.notify_keyspace_events & type)) return;
-
+    // 创建事件对象
     eventobj = createStringObject(event,strlen(event));
 
     /* __keyspace@<db>__:<key> <event> notifications. */
+    // 键空间通知，格式为 __keyspace@<db>__:<key> <event> notifications
     if (server.notify_keyspace_events & NOTIFY_KEYSPACE) {
         chan = sdsnewlen("__keyspace@",11);
         len = ll2string(buf,sizeof(buf),dbid);
@@ -128,6 +133,7 @@ void notifyKeyspaceEvent(int type, char *event, robj *key, int dbid) {
     }
 
     /* __keyevent@<db>__:<event> <key> notifications. */
+    // 键事件通知
     if (server.notify_keyspace_events & NOTIFY_KEYEVENT) {
         chan = sdsnewlen("__keyevent@",11);
         if (len == -1) len = ll2string(buf,sizeof(buf),dbid);
