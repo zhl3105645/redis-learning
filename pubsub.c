@@ -132,27 +132,34 @@ int clientSubscriptionsCount(client *c) {
 
 /* Subscribe a client to a channel. Returns 1 if the operation succeeded, or
  * 0 if the client was already subscribed to that channel. */
+// 订阅频道的底层实现
 int pubsubSubscribeChannel(client *c, robj *channel) {
     dictEntry *de;
     list *clients = NULL;
     int retval = 0;
 
     /* Add the channel to the client -> channels hash table */
+    // 添加频道到 client->pubsub_channels字典中
     if (dictAdd(c->pubsub_channels,channel,NULL) == DICT_OK) {
         retval = 1;
         incrRefCount(channel);
         /* Add the client to the channel -> list of clients hash table */
+        // 查找 server.pubsub_channels字典中是否存在该频道
         de = dictFind(server.pubsub_channels,channel);
         if (de == NULL) {
+            // 不存在创建
             clients = listCreate();
             dictAdd(server.pubsub_channels,channel,clients);
             incrRefCount(channel);
         } else {
+            // 如果存在，获取客户端列表
             clients = dictGetVal(de);
         }
+        // 将该客户端列表添加到客户端链表的尾部
         listAddNodeTail(clients,c);
     }
     /* Notify the client */
+    // 通知客户端
     addReplyPubsubSubscribed(c,channel);
     return retval;
 }
@@ -191,27 +198,33 @@ int pubsubUnsubscribeChannel(client *c, robj *channel, int notify) {
 }
 
 /* Subscribe a client to a pattern. Returns 1 if the operation succeeded, or 0 if the client was already subscribed to that pattern. */
+// 遍历模式串的底层实现
 int pubsubSubscribePattern(client *c, robj *pattern) {
     dictEntry *de;
     list *clients;
     int retval = 0;
-
+    // 查看链表中模式是否存在，若存在不做处理，反之添加
     if (listSearchKey(c->pubsub_patterns,pattern) == NULL) {
         retval = 1;
+        // 添加模式串到client->pubsub_patterns 链表的尾部
         listAddNodeTail(c->pubsub_patterns,pattern);
         incrRefCount(pattern);
         /* Add the client to the pattern -> list of clients hash table */
+        // 查找server.pubsub_patterns字典中是否存在该频道
         de = dictFind(server.pubsub_patterns,pattern);
         if (de == NULL) {
+            // 不存在则创建
             clients = listCreate();
             dictAdd(server.pubsub_patterns,pattern,clients);
             incrRefCount(pattern);
         } else {
+            // 存在则返回客户端列表
             clients = dictGetVal(de);
         }
         listAddNodeTail(clients,c);
     }
     /* Notify the client */
+    // 通知客户端
     addReplyPubsubPatSubscribed(c,pattern);
     return retval;
 }
@@ -336,6 +349,7 @@ int pubsubPublishMessage(robj *channel, robj *message) {
  *----------------------------------------------------------------------------*/
 
 /* SUBSCRIBE channel [channel ...] */
+// 订阅频道命令
 void subscribeCommand(client *c) {
     int j;
     if ((c->flags & CLIENT_DENY_BLOCKING) && !(c->flags & CLIENT_MULTI)) {
@@ -349,7 +363,7 @@ void subscribeCommand(client *c) {
         addReplyError(c, "SUBSCRIBE isn't allowed for a DENY BLOCKING client");
         return;
     }
-
+    // 遍历指令中所有频道
     for (j = 1; j < c->argc; j++)
         pubsubSubscribeChannel(c,c->argv[j]);
     c->flags |= CLIENT_PUBSUB;
@@ -382,7 +396,7 @@ void psubscribeCommand(client *c) {
         addReplyError(c, "PSUBSCRIBE isn't allowed for a DENY BLOCKING client");
         return;
     }
-
+    // 遍历模式串
     for (j = 1; j < c->argc; j++)
         pubsubSubscribePattern(c,c->argv[j]);
     c->flags |= CLIENT_PUBSUB;
