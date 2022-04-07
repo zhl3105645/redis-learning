@@ -54,24 +54,30 @@
  *
  * Lengths up to 63 are stored using a single byte, most DB keys, and may
  * values, will fit inside. */
-#define RDB_6BITLEN 0
-#define RDB_14BITLEN 1
-#define RDB_32BITLEN 0x80
-#define RDB_64BITLEN 0x81
-#define RDB_ENCVAL 3
+// 长度编码
+#define RDB_6BITLEN 0 // 6位编码，最大长度为64
+#define RDB_14BITLEN 1 // 14位长度
+#define RDB_32BITLEN 0x80 // 32位长度
+#define RDB_64BITLEN 0x81 // 64位长度
+#define RDB_ENCVAL 3 // 特殊编码，后六位表示特殊编码类型
 #define RDB_LENERR UINT64_MAX
 
 /* When a length of a string object stored on disk has the first two bits
  * set, the remaining six bits specify a special encoding for the object
  * accordingly to the following defines: */
+// 后面跟着的是8位的整数
 #define RDB_ENC_INT8 0        /* 8 bit signed integer */
+// 后面跟着的是16位的整数
 #define RDB_ENC_INT16 1       /* 16 bit signed integer */
+// 后面跟着的是32位的整数
 #define RDB_ENC_INT32 2       /* 32 bit signed integer */
+// 后面跟着的是LZF压缩后的数据
 #define RDB_ENC_LZF 3         /* string compressed with FASTLZ */
 
 /* Map object types to RDB object types. Macros starting with OBJ_ are for
  * memory storage and may change. Instead RDB types must be fixed because
  * we store them on disk. */
+// 将redis类型映射到RDB类型
 #define RDB_TYPE_STRING 0
 #define RDB_TYPE_LIST   1
 #define RDB_TYPE_SET    2
@@ -101,10 +107,13 @@
 #define RDB_OPCODE_IDLE       248   /* LRU idle time. */
 #define RDB_OPCODE_FREQ       249   /* LFU frequency. */
 #define RDB_OPCODE_AUX        250   /* RDB aux field. */
+// 初始化数据库字典的大小
 #define RDB_OPCODE_RESIZEDB   251   /* Hash table resize hint. */
 #define RDB_OPCODE_EXPIRETIME_MS 252    /* Expire time in milliseconds. */
 #define RDB_OPCODE_EXPIRETIME 253       /* Old expire time in seconds. */
+// 选择数据库
 #define RDB_OPCODE_SELECTDB   254   /* DB number of the following keys. */
+// RDB 文件的EOF结束标志
 #define RDB_OPCODE_EOF        255   /* End of the RDB file. */
 
 /* Module serialized values sub opcodes */
