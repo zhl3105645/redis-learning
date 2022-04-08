@@ -95,12 +95,14 @@ void flagTransaction(client *c) {
 }
 
 void multiCommand(client *c) {
+    // 检查是否开启了事务
     if (c->flags & CLIENT_MULTI) {
         addReplyError(c,"MULTI calls can not be nested");
         return;
     }
+    // 标记事务已经开启
     c->flags |= CLIENT_MULTI;
-
+    // 回复客户端
     addReply(c,shared.ok);
 }
 
